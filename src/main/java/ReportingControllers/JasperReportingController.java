@@ -1,9 +1,17 @@
 package ReportingControllers;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.io.StringWriter;
 import java.sql.SQLException;
 
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -15,13 +23,18 @@ import net.sf.jasperreports.engine.JRException;
 import net.sf.jasperreports.engine.JasperPrint;
 import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
 import net.sf.jasperreports.engine.export.JRCsvExporter;
+import net.sf.jasperreports.engine.export.JRPdfExporter;
 import net.sf.jasperreports.engine.export.JRTextExporter;
 import net.sf.jasperreports.engine.export.JRXmlExporter;
+import net.sf.jasperreports.export.SimpleCsvExporterConfiguration;
 import net.sf.jasperreports.export.SimpleExporterInput;
+import net.sf.jasperreports.export.SimpleOutputStreamExporterOutput;
+import net.sf.jasperreports.export.SimplePdfExporterConfiguration;
 import net.sf.jasperreports.export.SimpleTextExporterConfiguration;
 import net.sf.jasperreports.export.SimpleTextReportConfiguration;
 import net.sf.jasperreports.export.SimpleWriterExporterOutput;
 import net.sf.jasperreports.export.SimpleXmlExporterOutput;
+import net.sf.jasperreports.export.type.PdfPrintScalingEnum;
 import ReportingUtility.DynamicReportingUtil;
 
 @RestController
@@ -30,27 +43,31 @@ public class JasperReportingController {
 	public JasperReportingController() {
 		// TODO Auto-generated constructor stub
 	}
-	
+
 	@RequestMapping("/reportingService")
-	public String getJasperReport(@RequestParam(value="LocationID", defaultValue="") String LocationID, @RequestParam(value="LaneTypeID", defaultValue="") String LaneTypeID, @RequestParam(value="LaneID", defaultValue="") String LaneID, @RequestParam(value="ExportOption", defaultValue="1") String ExportOption)
-	{
+	public String getJasperReport(@RequestParam(value = "LocationID", defaultValue = "") String LocationID,
+			@RequestParam(value = "LaneTypeID", defaultValue = "") String LaneTypeID,
+			@RequestParam(value = "LaneID", defaultValue = "") String LaneID,
+			@RequestParam(value = "ExportOption", defaultValue = "2") String ExportOption) {
 		String ExportedReport = new String();
 		JasperPrint jp;
-		try 
-		{
+		try {
 			jp = this.getJasperPrint(LocationID, LaneTypeID, LaneID);
 			int eo = Integer.parseInt(ExportOption);
-			
-			switch (eo)
-			{
-			case 1: ExportedReport = this.ExportReportToXML(jp);
-			break;
-			case 2: ExportedReport = this.ExportReportToCSV(jp);
-			break;
-			case 3: ExportedReport = this.StringExportReportToText(jp);
-			break;
-			default: ExportedReport = "Invalid export option";
-			break;
+
+			switch (eo) {
+			case 1:
+				ExportedReport = this.ExportReportToXML(jp);
+				break;
+			case 2:
+				ExportedReport = this.ExportReportToCSV(jp);
+				break;
+			case 3:
+				ExportedReport = this.StringExportReportToText(jp);
+				break;
+			default:
+				ExportedReport = "Invalid export option";
+				break;
 			}
 		} catch (JRException e) {
 			// TODO Auto-generated catch block
@@ -59,36 +76,49 @@ public class JasperReportingController {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-	
+
 		return ExportedReport;
 	}
-	
-	private String ExportReportToXML(JasperPrint jp)
-	{
-		StringWriter XmlReportWriter = new StringWriter();
-		
-		try
-		{
+
+	@RequestMapping(value = "/exportPdf", method = RequestMethod.GET, produces = MediaType.APPLICATION_PDF_VALUE)
+	public ResponseEntity<InputStreamResource> ExportReportInPdf(
+			@RequestParam(value = "LocationID", defaultValue = "") String LocationID,
+			@RequestParam(value = "LaneTypeID", defaultValue = "") String LaneTypeID,
+			@RequestParam(value = "LaneID", defaultValue = "") String LaneID) throws JRException, SQLException {
+		JasperPrint jp = getJasperPrint(LocationID, LaneTypeID, LaneID);
+		ByteArrayInputStream bis = this.getReportInPdf(jp);
+		HttpHeaders header = new HttpHeaders();
+		header.add("Content-Disposition", "attachment; filename=TransactionsReport.pdf");
+
+		return ResponseEntity.ok().headers(header).contentType(MediaType.APPLICATION_PDF)
+				.body(new InputStreamResource(bis));
+	}
+
+	private String ExportReportToXML(JasperPrint jp) {
+		StringBuilder XmlReportWriter = new StringBuilder();
+
+		try {
 			SimpleXmlExporterOutput xmlOutput = new SimpleXmlExporterOutput(XmlReportWriter);
 			xmlOutput.setEmbeddingImages(true);
-			
+
 			JRXmlExporter xmlExporter = new JRXmlExporter();
 			xmlExporter.setExporterInput(new SimpleExporterInput(jp));
 			xmlExporter.setExporterOutput(xmlOutput);
 			xmlExporter.exportReport();
-		}
-		catch(Exception ex)
-		{
+		} catch (Exception ex) {
 			ex.printStackTrace();
 		}
-		
+
 		return XmlReportWriter.toString();
 	}
-	
-	private String ExportReportToCSV(JasperPrint jp) throws JRException
-	{
+
+	private String ExportReportToCSV(JasperPrint jp) throws JRException {
 		StringWriter sw = new StringWriter();
 		JRCsvExporter CSVExporter = new JRCsvExporter();
+		SimpleCsvExporterConfiguration exportConfig = new SimpleCsvExporterConfiguration();
+		exportConfig.setFieldDelimiter(",");
+		exportConfig.setRecordDelimiter("\n");
+		CSVExporter.setConfiguration(exportConfig);
 		SimpleExporterInput ExporterInput = new SimpleExporterInput(jp);
 		SimpleWriterExporterOutput WriterOutput = new SimpleWriterExporterOutput(sw);
 		CSVExporter.setExporterInput(ExporterInput);
@@ -96,20 +126,19 @@ public class JasperReportingController {
 		CSVExporter.exportReport();
 		return sw.toString();
 	}
-	
-	private String StringExportReportToText(JasperPrint jp) throws JRException
-	{
+
+	private String StringExportReportToText(JasperPrint jp) throws JRException {
 		JRTextExporter TextExporter = new JRTextExporter();
 		StringWriter sw = new StringWriter();
 		SimpleExporterInput ExporterInput = new SimpleExporterInput(jp);
 		SimpleWriterExporterOutput WriterOutput = new SimpleWriterExporterOutput(sw);
-		
-		SimpleTextExporterConfiguration TextExporterConfiguration = new SimpleTextExporterConfiguration ();
+
+		SimpleTextExporterConfiguration TextExporterConfiguration = new SimpleTextExporterConfiguration();
 		TextExporterConfiguration.setLineSeparator(",");
 		TextExporterConfiguration.setPageSeparator(".");
 		TextExporterConfiguration.setOverrideHints(false);
 		TextExporter.setConfiguration(TextExporterConfiguration);
-		
+
 		SimpleTextReportConfiguration TextReportConfiguration = new SimpleTextReportConfiguration();
 		TextReportConfiguration.setOverrideHints(false);
 		TextReportConfiguration.setCharWidth(9.0f);
@@ -117,18 +146,38 @@ public class JasperReportingController {
 		TextExporter.setConfiguration(TextReportConfiguration);
 		TextExporter.setExporterInput(ExporterInput);
 		TextExporter.setExporterOutput(WriterOutput);
-		
+
 		TextExporter.exportReport();
 		return sw.toString();
 	}
-	
-	public JasperPrint getJasperPrint(String LocationID, String LaneTypeID, String LaneID) throws JRException, SQLException
-	{
+
+	@SuppressWarnings("unused")
+	private ByteArrayInputStream getReportInPdf(JasperPrint jp) {
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+		try {
+			JRPdfExporter PdfExporter = new JRPdfExporter();
+			PdfExporter.setExporterInput(new SimpleExporterInput(jp));
+			PdfExporter.setExporterOutput(new SimpleOutputStreamExporterOutput(baos));
+			SimplePdfExporterConfiguration PdfConfig = new SimplePdfExporterConfiguration();
+			PdfConfig.setPrintScaling(PdfPrintScalingEnum.DEFAULT);
+			PdfExporter.setConfiguration(PdfConfig);
+			PdfExporter.exportReport();
+		} catch (JRException je) {
+			je.printStackTrace();
+		}
+
+		return new ByteArrayInputStream(baos.toByteArray());
+	}
+
+	public JasperPrint getJasperPrint(String LocationID, String LaneTypeID, String LaneID)
+			throws JRException, SQLException {
 		DynamicReportingUtil dru = new DynamicReportingUtil();
 		DynamicReport report = dru.buildJasperReport(LocationID, LaneTypeID, LaneID);
 		TransactionAPI RFIDTransAPI = new TransactionAPI();
-		JRBeanCollectionDataSource TransactionDS = new JRBeanCollectionDataSource(RFIDTransAPI.getRFIDTransactions(LocationID, LaneTypeID, LaneID));
+		JRBeanCollectionDataSource TransactionDS = new JRBeanCollectionDataSource(
+				RFIDTransAPI.getRFIDTransactions(LocationID, LaneTypeID, LaneID));
 		return DynamicJasperHelper.generateJasperPrint(report, new ClassicLayoutManager(), TransactionDS);
-		//return null;
+		// return null;
 	}
 }

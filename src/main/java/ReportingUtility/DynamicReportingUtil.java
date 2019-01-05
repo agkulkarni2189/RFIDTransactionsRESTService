@@ -39,6 +39,9 @@ public class DynamicReportingUtil {
 		HeaderFont.setBold(true);
 		HeaderFont.setFontName(Font.ARIAL_BIG.getFontName());
 		HeaderFont.setFontSize(16.0f);
+		HeaderFont.setPdfFontEmbedded(false);
+		HeaderFont.setPdfFontName("Helvetica");
+		HeaderFont.setPdfFontEncoding(Font.PDF_ENCODING_CP1252_Western_European_ANSI);
 		HeaderStyle.setFont(HeaderFont);
 
 		Style ContentStyle = new Style();
@@ -50,6 +53,9 @@ public class DynamicReportingUtil {
 		Font ContentFont = new Font();
 		ContentFont.setFontName(Font.ARIAL_SMALL.getFontName());
 		ContentFont.setFontSize(13.0f);
+		ContentFont.setPdfFontEmbedded(false);
+		ContentFont.setPdfFontEncoding(Font.PDF_ENCODING_CP1252_Western_European_ANSI);
+		ContentFont.setPdfFontName("Helvetica");
 		ContentStyle.setFont(ContentFont);
 		
 		AbstractColumn TagIDCol = ColumnBuilder.getNew().setColumnProperty("tag_id", Integer.class.getName())
