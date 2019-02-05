@@ -63,11 +63,13 @@ public class JasperReportingController {
 	public String getJasperReport(@RequestParam(value = "LocationID", defaultValue = "") String LocationID,
 			@RequestParam(value = "LaneTypeID", defaultValue = "") String LaneTypeID,
 			@RequestParam(value = "LaneID", defaultValue = "") String LaneID,
+			@RequestParam(value = "FromCreationDate", defaultValue = "") String FromCreationDate,
+			@RequestParam(value = "ToCreationDate", defaultValue = "") String ToCreationDate,
 			@RequestParam(value = "ExportOption", defaultValue = "2") String ExportOption) {
 		String ExportedReport = new String();
 		JasperPrint jp;
 		try {
-			jp = this.getJasperPrint(LocationID, LaneTypeID, LaneID, "1");
+			jp = this.getJasperPrint(LocationID, LaneTypeID, LaneID, FromCreationDate, ToCreationDate, "1");
 			int eo = Integer.parseInt(ExportOption);
 
 			switch (eo) {
@@ -101,19 +103,26 @@ public class JasperReportingController {
 
 		return ExportedReport;
 	}
-	
-	@RequestMapping(value="/printReport", method = RequestMethod.GET)
-	public void printReport(@RequestParam(value = "LocationID", defaultValue = "") String LocationID, @RequestParam(value = "LaneTypeID", defaultValue = "") String LaneTypeID, @RequestParam(value = "LaneID", defaultValue = "") String LaneID) throws JRException, SQLException
-	{
-		JasperPrintManager.printReport(this.getJasperPrint(LocationID, LaneTypeID, LaneID, "1"), true);
+
+	@RequestMapping(value = "/printReport", method = RequestMethod.GET, produces = MediaType.ALL_VALUE)
+	public void printReport(
+			@RequestParam(value = "LocationID", defaultValue = "") String LocationID,
+			@RequestParam(value = "LaneTypeID", defaultValue = "") String LaneTypeID,
+			@RequestParam(value = "LaneID", defaultValue = "") String LaneID,
+			@RequestParam(value = "FromCreationDate", defaultValue = "") String FromCreationDate,
+			@RequestParam(value = "ToCreationDate", defaultValue = "") String ToCreationDate) throws JRException, SQLException {
+		JasperPrintManager.printReport(this.getJasperPrint(LocationID, LaneTypeID, LaneID, FromCreationDate, ToCreationDate, "1"), true);
 	}
-	
+
 	@RequestMapping(value = "/exportPdf", method = RequestMethod.GET, produces = MediaType.APPLICATION_PDF_VALUE)
 	public ResponseEntity<InputStreamResource> ExportReportInPdf(
 			@RequestParam(value = "LocationID", defaultValue = "") String LocationID,
 			@RequestParam(value = "LaneTypeID", defaultValue = "") String LaneTypeID,
-			@RequestParam(value = "LaneID", defaultValue = "") String LaneID) throws JRException, SQLException {
-		JasperPrint jp = getJasperPrint(LocationID, LaneTypeID, LaneID, "2");
+			@RequestParam(value = "LaneID", defaultValue = "") String LaneID,
+			@RequestParam(value = "FromCreationDate", defaultValue = "") String FromCreationDate,
+			@RequestParam(value = "ToCreationDate", defaultValue = "") String ToCreationDate)
+			throws JRException, SQLException {
+		JasperPrint jp = getJasperPrint(LocationID, LaneTypeID, LaneID, FromCreationDate, ToCreationDate, "2");
 		ByteArrayInputStream bis = this.getReportInPdf(jp);
 		HttpHeaders header = new HttpHeaders();
 		header.add("Content-Disposition", "attachment; filename=TransactionsReport.pdf");
@@ -126,39 +135,40 @@ public class JasperReportingController {
 	public ResponseEntity<InputStreamResource> ExportReportInExcel(
 			@RequestParam(value = "LocationID", defaultValue = "") String LocationID,
 			@RequestParam(value = "LaneTypeID", defaultValue = "") String LaneTypeID,
-			@RequestParam(value = "LaneID", defaultValue = "") String LaneID) throws JRException, SQLException {
-		ByteArrayInputStream bis = this.getReportInExcel(this.getJasperPrint(LocationID, LaneTypeID, LaneID, "3"));
+			@RequestParam(value = "LaneID", defaultValue = "") String LaneID,
+			@RequestParam(value = "FromCreationDate", defaultValue = "") String FromCreationDate,
+			@RequestParam(value = "ToCreationDate", defaultValue = "") String ToCreationDate)
+			throws JRException, SQLException {
+		ByteArrayInputStream bis = this.getReportInExcel(
+				this.getJasperPrint(LocationID, LaneTypeID, LaneID, FromCreationDate, ToCreationDate, "3"));
 		HttpHeaders header = new HttpHeaders();
 		header.add("Content-Disposition", "attachment; filename=TransactionsReport.xlsx");
 
 		return ResponseEntity.ok().headers(header).contentType(MediaType.MULTIPART_FORM_DATA)
 				.body(new InputStreamResource(bis));
 	}
-	
-	@RequestMapping(value="/getLocations", method=RequestMethod.GET, produces=MediaType.APPLICATION_JSON_VALUE)
-	@CrossOrigin(origins="*")
-	public List<Location> getAllLocations()
-	{
+
+	@RequestMapping(value = "/getLocations", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+	@CrossOrigin(origins = "*")
+	public List<Location> getAllLocations() {
 		LocationAPI LocationEntityMethods = new LocationAPI();
 		return LocationEntityMethods.getAllLocations();
 	}
-	
-	@RequestMapping(value="/getLanes", method=RequestMethod.GET, produces=MediaType.APPLICATION_JSON_VALUE)
-	@CrossOrigin(origins="*")
-	public List<Lane> getAllLanes()
-	{
+
+	@RequestMapping(value = "/getLanes", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+	@CrossOrigin(origins = "*")
+	public List<Lane> getAllLanes() {
 		LaneAPI LaneEntityMethods = new LaneAPI();
 		return LaneEntityMethods.getAllLanes();
 	}
-	
-	@RequestMapping(value="/getLaneTypes", method=RequestMethod.GET, produces=MediaType.APPLICATION_JSON_VALUE)
-	@CrossOrigin(origins="*")
-	public List<LaneType> getAllLaneTypes()
-	{
+
+	@RequestMapping(value = "/getLaneTypes", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+	@CrossOrigin(origins = "*")
+	public List<LaneType> getAllLaneTypes() {
 		LaneTypeAPI LaneTypeEntityMethods = new LaneTypeAPI();
 		return LaneTypeEntityMethods.getAllLaneTypes();
 	}
-	
+
 	private String ExportReportToXML(JasperPrint jp) {
 		StringBuilder XmlReportWriter = new StringBuilder();
 
@@ -273,18 +283,20 @@ public class JasperReportingController {
 	}
 
 	@RequestMapping(value = "/exportJSON")
-	@CrossOrigin(origins="*")
+	@CrossOrigin(origins = "*")
 	public List<RFIDTransaction> getReportInJSON(
 			@RequestParam(value = "LocationID", defaultValue = "") String LocationID,
 			@RequestParam(value = "LaneTypeID", defaultValue = "") String LaneTypeID,
-			@RequestParam(value = "LaneID", defaultValue = "") String LaneID) {
+			@RequestParam(value = "LaneID", defaultValue = "") String LaneID,
+			@RequestParam(value = "FromCreationDate", defaultValue = "") String FromCreationDate,
+			@RequestParam(value = "ToCreationDate", defaultValue = "") String ToCreationDate) {
 		TransactionAPI RFIDTransAPI = new TransactionAPI();
-		return RFIDTransAPI.getRFIDTransactions(LocationID, LaneTypeID, LaneID);
+		return RFIDTransAPI.getRFIDTransactions(LocationID, LaneTypeID, LaneID, FromCreationDate, ToCreationDate);
 
 	}
 
-	private JasperPrint getJasperPrint(String LocationID, String LaneTypeID, String LaneID, String ExportOption)
-			throws JRException, SQLException {
+	private JasperPrint getJasperPrint(String LocationID, String LaneTypeID, String LaneID, String FromCreationDate,
+			String ToCreationDate, String ExportOption) throws JRException, SQLException {
 		DynamicReportingUtil dru = new DynamicReportingUtil();
 		int ExpOpt = Integer.parseInt(ExportOption);
 		DynamicReport report = null;
@@ -306,7 +318,7 @@ public class JasperReportingController {
 
 		TransactionAPI RFIDTransAPI = new TransactionAPI();
 		JRBeanCollectionDataSource TransactionDS = new JRBeanCollectionDataSource(
-				RFIDTransAPI.getRFIDTransactions(LocationID, LaneTypeID, LaneID));
+				RFIDTransAPI.getRFIDTransactions(LocationID, LaneTypeID, LaneID, FromCreationDate, ToCreationDate));
 		return DynamicJasperHelper.generateJasperPrint(report, new ClassicLayoutManager(), TransactionDS);
 	}
 }
